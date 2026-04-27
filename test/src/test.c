@@ -19,4 +19,5 @@ void main(void)
 	printf("Hello.world\n");
 	printf("1");
 	printf("2");
+	printf("3");
 }
