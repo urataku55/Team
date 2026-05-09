@@ -1,3 +1,4 @@
+//
 #include <board.h>
 /***宣言***/
 /**define**/
