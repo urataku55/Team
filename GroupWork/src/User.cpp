@@ -1,4 +1,4 @@
-
+//コメント　湯浅
 #include <board.h>
 /***宣言***/
 /**define**/
