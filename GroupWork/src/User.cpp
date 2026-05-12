@@ -31,6 +31,10 @@ typedef struct {
 	bool timeFlag;						//計測中フラグ
 	unsigned long outStartTime;			//コースアウト開始時間
 	bool outFlag;						//コースアウトフラグ
+	int lineCount;						//スタートラインを通過した回数
+	unsigned long blackLineTime;		//黒ライン上の時間
+	unsigned long lineTime;				//閾値が切り替わった時間
+	bool onLine;						//ライン上に来たか
 }RunState;
 RunState runS;
 /*ボタン用*/
@@ -45,12 +49,12 @@ typedef struct {
 BtnState btnS;
 /**グローバル変数**/
 unsigned long now = 0;		//現在時刻
-
 /**プロトタイプ宣言**/
 void checkBtn(BtnState* pBtnS, State* pState);
 void runTimeMeasurement(RunState* pRunS, State* pState);
 void statusDisplay(RunState* pRunS, State* pState);
 void avoidCollision(State* pState);
+bool checkGoal(RunState* pRunS);
 /***セットアップ***/
 void setup() {
 	/*初期状態はIDLE*/
@@ -114,7 +118,11 @@ void loop() {
 			/*ラインに戻ったらリセット*/
 			runS.outFlag = false;
 		}
-
+		/*3周したか確認しゴールしていたら停止させる*/
+		if(checkGoal(&runS) == true) {
+			state = STATE_STOP;
+			break;
+		}
 		/*センサー誤差確認*/
 		//左に重みを少し持たせている
 		runS.gap = runS.sensorL+85 - runS.sensorR;//トレースセンサの誤差調整必要
@@ -228,6 +236,10 @@ void statusDisplay(RunState* pRunS, State* pState) {
 	/*走行状態*/
 	case STATE_RUN :
 		LcdDrv_print("\xbf\xb3\xba\xb3\xc1\xa9\xb3");	//ｿｳｺｳﾁｭｳ
+		char buf[20];
+		snprintf(buf, sizeof(buf), "CNT:%d", pRunS->lineCount);
+		LcdDrv_setCursor(0,1);
+		LcdDrv_print(buf);
 		break;
 	/*停止状態*/
 	case STATE_STOP :
@@ -244,7 +256,33 @@ void statusDisplay(RunState* pRunS, State* pState) {
 	}
 	LcdDrv_update();
 }
-
 void avoidCollision(State* pState){
 	*pState = STATE_IDLE;
+}
+/**3周したか確認する関数**/
+bool checkGoal(RunState* pRunS) {
+	bool isBlackL = (pRunS -> sensorL) >= 2000;
+	bool isBlackR = (pRunS -> sensorR) >= 2000;
+	bool isWhiteL = (pRunS -> sensorL) <= 400;
+	bool isWhiteR = (pRunS -> sensorR) <= 400;
+	/*センサーの閾値が白と黒または黒と黒の場合その時間を記録する*/
+	if((isBlackL && isWhiteR) || (isWhiteL && isBlackR) || (isBlackL && isBlackR)) {
+		pRunS -> lineTime = millis();
+	}
+	/*センサーの閾値が両方黒かつ閾値が切り替わる時間が200ms秒以下ならゴールライン上にいるとみなす*/
+	if(isBlackL && isBlackR && (millis() - pRunS -> lineTime <= 200) && pRunS -> onLine == false) {
+		pRunS -> blackLineTime = millis();
+		pRunS -> onLine = true;
+	}
+	/*ゴールライン上にいる時間が200ms秒を超えたらカウントを増やす*/
+	if(millis() - pRunS -> blackLineTime >= 200 && pRunS -> onLine == true) {
+		pRunS -> lineCount++;
+		pRunS -> onLine = false;
+	}
+	/*3周していたらゴールフラグをtrueにする*/
+	if(pRunS -> lineCount == 7) {
+		pRunS -> lineCount = 0;
+		return true;
+	}
+	return false;
 }
