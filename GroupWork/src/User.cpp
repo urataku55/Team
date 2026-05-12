@@ -7,8 +7,8 @@
 #define BTN_ON HIGH						//ボタンON
 #define BTN_OFF LOW						//ボタンOFF
 #define MOTOR_SPEEDL 51					//通常左モーター速度
-#define MOTOR_SPEEDR 50					//通常右モーター速度
-#define MAX_SPEED 63						//最大速度
+#define MOTOR_SPEEDR 53				//通常右モーター速度
+#define MAX_SPEED 65						//最大速度
 #define STOP_LINE 1000					//停止する閾値(白)
 /**enum**/
 typedef enum {
@@ -57,6 +57,9 @@ void setup() {
 	state = STATE_IDLE;
 	/*構造体の初期化*/
 	RunState runS = {0};
+	runS.sensorL = 0;
+	runS.sensorR = 0;
+
 	BtnState btnS = {0};
 	/*ディスプレイの初期化*/
 	LcdDrv_clear();
@@ -69,7 +72,8 @@ void loop() {
 	int baseSpeedL;              //左ベーススピード
 	int baseSpeedR;              //右ベーススピード
 	int diff;                   //急激な角度変化量に対応
-	static int prevGap = 0;                //直前の角度のgap
+	static int prevGap = 0;     //直前の角度のgap
+	static bool startFlag = true;  //走行開始時専用の速度調整
 	/**ボタンをチェックする(BTN_PERIOD ms秒)**/
 	if(now - btnS.prev >= BTN_PERIOD) {
 		btnS.prev = now;
@@ -95,9 +99,15 @@ void loop() {
 		break;
 	/*走行状態*/
 	case STATE_RUN :
-		/*センサー読み込み*/
-		runS.sensorL = analogRead(PIN_LINE_L);
-		runS.sensorR = analogRead(PIN_LINE_R);
+		if(startFlag){
+			runS.sensorL = analogRead(PIN_LINE_L);
+			runS.sensorR = analogRead(PIN_LINE_R);
+			startFlag = false;
+		}else{
+			/*センサー読み込み*/
+			runS.sensorL = (runS.sensorL*7 + analogRead(PIN_LINE_L)*3)/10;
+			runS.sensorR = (runS.sensorR*7 + analogRead(PIN_LINE_R)*3)/10;
+		}
 		/*ラインから外れたら停止する*/
 		if(runS.sensorL < STOP_LINE && runS.sensorR < STOP_LINE) {
 			/*外れ始め*/
@@ -151,6 +161,7 @@ void loop() {
 	case STATE_STOP :
 		analogWrite(PIN_MOTOR_L, 0);
 		analogWrite(PIN_MOTOR_R, 0);
+		startFlag = true;
 		break;
 	/*例外*/
 	default :
