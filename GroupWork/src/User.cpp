@@ -73,6 +73,7 @@ void loop() {
 	int baseSpeedL;              //左ベーススピード
 	int baseSpeedR;              //右ベーススピード
 	int diff;                   //急激な角度変化量に対応
+	static bool startFlag = true; //稼働時速度調整用
 	static int prevGap = 0;                //直前の角度のgap
 	/**ボタンをチェックする(BTN_PERIOD ms秒)**/
 	if(now - btnS.prev >= BTN_PERIOD) {
@@ -99,9 +100,15 @@ void loop() {
 		break;
 	/*走行状態*/
 	case STATE_RUN :
-		/*センサー読み込み*/
-		runS.sensorL = analogRead(PIN_LINE_L);
-		runS.sensorR = analogRead(PIN_LINE_R);
+		if(startFlag){
+			runS.sensorL = analogRead(PIN_LINE_L);
+			runS.sensorR = analogRead(PIN_LINE_R);
+			startFlag = false;
+		}else{
+			/*センサー読み込み*/
+			runS.sensorL = (runS.sensorL*7 + analogRead(PIN_LINE_L)*3)/10;
+			runS.sensorR = (runS.sensorR*7 + analogRead(PIN_LINE_R)*3)/10;
+		}
 		/*ラインから外れたら停止する*/
 		if(runS.sensorL < STOP_LINE && runS.sensorR < STOP_LINE) {
 			/*外れ始め*/
