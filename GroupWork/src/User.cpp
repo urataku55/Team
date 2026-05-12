@@ -123,7 +123,6 @@ void loop() {
 			state = STATE_STOP;
 			break;
 		}
-
 		/*センサー誤差確認*/
 		//左に重みを少し持たせている
 		runS.gap = runS.sensorL+85 - runS.sensorR;//トレースセンサの誤差調整必要
