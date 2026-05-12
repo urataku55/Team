@@ -50,6 +50,7 @@ unsigned long now = 0;		//現在時刻
 void checkBtn(BtnState* pBtnS, State* pState);
 void runTimeMeasurement(RunState* pRunS, State* pState);
 void statusDisplay(RunState* pRunS, State* pState);
+void avoidCollision(State* pState);
 /***セットアップ***/
 void setup() {
 	/*初期状態はIDLE*/
@@ -74,6 +75,15 @@ void loop() {
 		btnS.prev = now;
 		checkBtn(&btnS, &state);
 	}
+
+	/*5cm先にものがあったら停止する*/
+	if(analogRead(PIN_DISTANCE) < 50){
+		avoidCollision(&state);
+		digitalWrite(PIN_LED3, HIGH);
+	}else{
+		digitalWrite(PIN_LED3, LOW);
+	}
+
 	/**タイム計測処理**/
 	runTimeMeasurement(&runS, &state);
 	/**動作処理**/
@@ -233,4 +243,8 @@ void statusDisplay(RunState* pRunS, State* pState) {
 		break;
 	}
 	LcdDrv_update();
+}
+
+void avoidCollision(State* pState){
+	*pState = STATE_IDLE;
 }
