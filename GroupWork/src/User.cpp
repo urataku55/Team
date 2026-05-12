@@ -7,7 +7,7 @@
 #define BTN_ON HIGH						//ボタンON
 #define BTN_OFF LOW						//ボタンOFF
 #define MOTOR_SPEED 50					//通常モーター速度
-#define MAX_SPEED 55					//最大速度
+#define MAX_SPEED 50					//最大速度
 #define STOP_LINE 1000					//停止する閾値(白)
 /**enum**/
 typedef enum {
@@ -30,6 +30,9 @@ typedef struct {
 	bool timeFlag;						//計測中フラグ
 	unsigned long outStartTime;			//コースアウト開始時間
 	bool outFlag;						//コースアウトフラグ
+	int lineCount;						//スタートラインを通過した回数
+	unsigned long blackLineTime;		//黒ライン上の時間
+	bool onLine;						//ライン上に来たか
 }RunState;
 RunState runS;
 /*ボタン用*/
@@ -44,10 +47,12 @@ typedef struct {
 BtnState btnS;
 /**グローバル変数**/
 unsigned long now = 0;		//現在時刻
+unsigned long a = 0;
 /**プロトタイプ宣言**/
 void checkBtn(BtnState* pBtnS, State* pState);
 void runTimeMeasurement(RunState* pRunS, State* pState);
 void statusDisplay(RunState* pRunS, State* pState);
+bool checkGoal(RunState* pRunS);
 /***セットアップ***/
 void setup() {
 	/*初期状態はIDLE*/
@@ -82,6 +87,7 @@ void loop() {
 		/*センサー読み込み*/
 		runS.sensorL = analogRead(PIN_LINE_L);
 		runS.sensorR = analogRead(PIN_LINE_R);
+
 		/*ラインから外れたら停止する*/
 		if(runS.sensorL < STOP_LINE && runS.sensorR < STOP_LINE) {
 			/*外れ始め*/
@@ -98,10 +104,15 @@ void loop() {
 			/*ラインに戻ったらリセット*/
 			runS.outFlag = false;
 		}
+		/*3周したか確認しゴールしていたら停止させる*/
+		if(checkGoal(&runS) == true) {
+			state = STATE_STOP;
+			break;
+		}
 		/*センサー誤差確認*/
 		runS.gap = runS.sensorL - runS.sensorR;
 		/*P制御*/
-		runS.control = runS.gap / 45;
+		runS.control = runS.gap / 50;
 		/*モーター速度調整*/
 		runS.leftSpeed = MOTOR_SPEED - runS.control;
 		runS.rightSpeed = MOTOR_SPEED + runS.control;
@@ -192,7 +203,16 @@ void statusDisplay(RunState* pRunS, State* pState) {
 		break;
 	/*走行状態*/
 	case STATE_RUN :
-		LcdDrv_print("\xbf\xb3\xba\xb3\xc1\xa9\xb3");	//ｿｳｺｳﾁｭｳ
+		//LcdDrv_print("\xbf\xb3\xba\xb3\xc1\xa9\xb3");	//ｿｳｺｳﾁｭｳ
+
+
+		char buf[20];
+
+		    snprintf(buf, sizeof(buf), "CNT:%d", pRunS->lineCount);
+		    LcdDrv_setCursor(0,0);
+		    LcdDrv_print(buf);
+
+
 		break;
 	/*停止状態*/
 	case STATE_STOP :
@@ -208,4 +228,30 @@ void statusDisplay(RunState* pRunS, State* pState) {
 		break;
 	}
 	LcdDrv_update();
+}
+/**3周したか確認する関数**/
+bool checkGoal(RunState* pRunS) {
+
+	/*センサーの閾値が白と黒の場合その時間を記録する*/
+	if(pRunS -> sensorL <= 400 && pRunS -> sensorR >= 2000) {
+		a = millis();
+	}else if(pRunS -> sensorL >= 2000 && pRunS -> sensorR <= 400) {
+		a = millis();
+	}
+	/*センサーの閾値が両方黒かつ閾値が切り替わる時間が200ms秒以下かつラインフラグがfalseならゴールライン上にいる計測を始める*/
+	if(pRunS -> sensorL >= 2000 && pRunS -> sensorR >= 2000 && millis() - a <= 200 && pRunS -> onLine == false) {
+		pRunS -> blackLineTime = millis();
+		pRunS -> onLine = true;
+	}
+	/*ゴールライン上にいる時間が250ms秒を超えたらカウントを増やす*/
+	if(pRunS -> onLine == true && millis() - (pRunS -> blackLineTime) >= 250) {
+		(pRunS -> lineCount)++;
+		pRunS -> onLine = false;
+	}
+	/*3周していたらゴールフラグをtrueにする*/
+	if(pRunS -> lineCount == 7) {
+		pRunS -> lineCount = 0;
+		return true;
+	}
+	return false;
 }
