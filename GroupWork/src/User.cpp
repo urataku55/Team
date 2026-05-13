@@ -6,8 +6,8 @@
 #define LONG_PRESS_TIME 3000			//長押し判定時間 ms秒
 #define BTN_ON HIGH						//ボタンON
 #define BTN_OFF LOW						//ボタンOFF
-#define MOTOR_SPEEDL 53					//通常左モーター速度
-#define MOTOR_SPEEDR 51				　　　//通常右モーター速度
+#define MOTOR_SPEEDL 52					//通常左モーター速度
+#define MOTOR_SPEEDR 51					//通常右モーター速度
 #define MAX_SPEED 63						//最大速度
 #define STOP_LINE 1000					//停止する閾値(白)
 /**enum**/
