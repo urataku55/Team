@@ -9,7 +9,7 @@
 #define MOTOR_SPEEDL 51					//通常左モーター速度
 #define MOTOR_SPEEDR 50					//通常右モーター速度
 #define MAX_SPEED 63						//最大速度
-#define STOP_LINE 1000					//停止する閾値(白)
+#define STOP_LINE 1500					//停止する閾値(白)
 /**enum**/
 typedef enum {
 	STATE_IDLE = 0,
@@ -109,8 +109,8 @@ void loop() {
 				runS.outStartTime = millis();
 				runS.outFlag = true;
 			}
-			/*5秒経過したら停止*/
-			if(millis() - runS.outStartTime >= 5000) {
+			/*3秒経過したら停止*/
+			if(millis() - runS.outStartTime >= 3000) {
 				state = STATE_STOP;
 				break;
 			}
