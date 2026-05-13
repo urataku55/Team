@@ -6,8 +6,8 @@
 #define LONG_PRESS_TIME 3000			//長押し判定時間 ms秒
 #define BTN_ON HIGH						//ボタンON
 #define BTN_OFF LOW						//ボタンOFF
-#define MOTOR_SPEEDL 52					//通常左モーター速度
-#define MOTOR_SPEEDR 51					//通常右モーター速度
+#define MOTOR_SPEEDL 51					//通常左モーター速度
+#define MOTOR_SPEEDR 50					//通常右モーター速度
 #define MAX_SPEED 65						//最大速度
 #define STOP_LINE 1500					//停止する閾値(白)
 /**enum**/
@@ -116,8 +116,10 @@ void changeDrivingMode(RunState* pRunS, State* pState){
 				startFlag = false;
 			}else{
 				/*センサー読み込み*/
-				pRunS->sensorL = (pRunS->sensorL*7 + analogRead(PIN_LINE_L)*3)/10;
-				pRunS->sensorR = (pRunS->sensorR*7 + analogRead(PIN_LINE_R)*3)/10;
+				pRunS->sensorL =
+						(pRunS->sensorL*7 + analogRead(PIN_LINE_L)*3)/10;
+				pRunS->sensorR =
+						(pRunS->sensorR*7 + analogRead(PIN_LINE_R)*3)/10;
 			}
 			/*ラインから外れたら停止する*/
 			if(pRunS->sensorL < STOP_LINE && pRunS->sensorR < STOP_LINE) {
@@ -165,8 +167,8 @@ void changeDrivingMode(RunState* pRunS, State* pState){
 			pRunS->rightSpeed = baseSpeedR + pRunS->control;
 
 			//速度制限
-			pRunS->leftSpeed = constrain(pRunS->leftSpeed,5,MAX_SPEED);
-			pRunS->rightSpeed = constrain(pRunS->rightSpeed,5,MAX_SPEED);
+			pRunS->leftSpeed = constrain(pRunS->leftSpeed,0,MAX_SPEED);
+			pRunS->rightSpeed = constrain(pRunS->rightSpeed,0,MAX_SPEED);
 
 			/*モーター始動*/
 			analogWrite(PIN_MOTOR_L, pRunS->leftSpeed);
