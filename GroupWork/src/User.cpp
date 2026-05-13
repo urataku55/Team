@@ -6,9 +6,9 @@
 #define LONG_PRESS_TIME 3000			//長押し判定時間 ms秒
 #define BTN_ON HIGH						//ボタンON
 #define BTN_OFF LOW						//ボタンOFF
-#define MOTOR_SPEEDL 52					//通常左モーター速度
-#define MOTOR_SPEEDR 51					//通常右モーター速度
-#define MAX_SPEED 63						//最大速度
+#define MOTOR_SPEEDL 51					//通常左モーター速度
+#define MOTOR_SPEEDR 50					//通常右モーター速度
+#define MAX_SPEED 65						//最大速度
 #define STOP_LINE 1500					//停止する閾値(白)
 /**enum**/
 typedef enum {
@@ -55,6 +55,7 @@ void runTimeMeasurement(RunState* pRunS, State* pState);
 void statusDisplay(RunState* pRunS, State* pState);
 void avoidCollision(State* pState);
 bool checkGoal(RunState* pRunS);
+void changeDrivingMode(RunState* pRunS, State* pState);
 /***セットアップ***/
 void setup() {
 	/*初期状態はIDLE*/
@@ -70,17 +71,11 @@ void setup() {
 void loop() {
 	/*現在時刻の取得*/
 	now = millis();
-	int baseSpeedL;              //左ベーススピード
-	int baseSpeedR;              //右ベーススピード
-	int diff;                   //急激な角度変化量に対応
-	static bool startFlag = true; //稼働時速度調整用
-	static int prevGap = 0;                //直前の角度のgap
 	/**ボタンをチェックする(BTN_PERIOD ms秒)**/
 	if(now - btnS.prev >= BTN_PERIOD) {
 		btnS.prev = now;
 		checkBtn(&btnS, &state);
 	}
-
 	/*5cm先にものがあったら停止する*/
 	if(analogRead(PIN_DISTANCE) < 50){
 		avoidCollision(&state);
@@ -88,95 +83,112 @@ void loop() {
 	}else{
 		digitalWrite(PIN_LED3, LOW);
 	}
-
 	/**タイム計測処理**/
 	runTimeMeasurement(&runS, &state);
 	/**動作処理**/
-	switch(state) {
-	/*待機状態*/
-	case STATE_IDLE :
-		analogWrite(PIN_MOTOR_L, 0);
-		analogWrite(PIN_MOTOR_R, 0);
-		break;
-	/*走行状態*/
-	case STATE_RUN :
-		if(startFlag){
-			runS.sensorL = analogRead(PIN_LINE_L);
-			runS.sensorR = analogRead(PIN_LINE_R);
-			startFlag = false;
-		}else{
-			/*センサー読み込み*/
-			runS.sensorL = (runS.sensorL*7 + analogRead(PIN_LINE_L)*3)/10;
-			runS.sensorR = (runS.sensorR*7 + analogRead(PIN_LINE_R)*3)/10;
-		}
-		/*ラインから外れたら停止する*/
-		if(runS.sensorL < STOP_LINE && runS.sensorR < STOP_LINE) {
-			/*外れ始め*/
-			if(runS.outFlag == false) {
-				runS.outStartTime = millis();
-				runS.outFlag = true;
-			}
-			/*3秒経過したら停止*/
-			if(millis() - runS.outStartTime >= 3000) {
-				state = STATE_STOP;
-				break;
-			}
-		}else {
-			/*ラインに戻ったらリセット*/
-			runS.outFlag = false;
-		}
-		/*3周したか確認しゴールしていたら停止させる*/
-		if(checkGoal(&runS) == true) {
-			state = STATE_STOP;
-			break;
-		}
-		/*センサー誤差確認*/
-		//左に重みを少し持たせている
-		runS.gap = runS.sensorL+85 - runS.sensorR;//トレースセンサの誤差調整必要
-		diff = runS.gap -prevGap;
-
-		/*gapに応じて速度を連続変化*/
-		//基本速度に直接影響
-		baseSpeedL = MOTOR_SPEEDL - abs(runS.gap/60) - abs(diff/15);//80,20は調整必要
-		baseSpeedR = MOTOR_SPEEDR - abs(runS.gap/60) - abs(diff/15);
-
-		/*baseSpeedを上限下限値に調整*/
-		baseSpeedL = constrain(baseSpeedL,15,MOTOR_SPEEDL);
-		baseSpeedR = constrain(baseSpeedR,15,MOTOR_SPEEDR);
-
-		/*P制御*/
-		//曲がるときの左右の車輪の回転数に直接影響
-		runS.control = runS.gap / 25 + diff / 7;//40,15も調整必要
-
-		/*モーター速度調整*/
-		runS.leftSpeed = baseSpeedL - runS.control;
-		runS.rightSpeed = baseSpeedR + runS.control;
-
-		//速度制限
-		runS.leftSpeed = constrain(runS.leftSpeed,0,MAX_SPEED);
-		runS.rightSpeed = constrain(runS.rightSpeed,0,MAX_SPEED);
-
-		/*モーター始動*/
-		analogWrite(PIN_MOTOR_L, runS.leftSpeed);
-		analogWrite(PIN_MOTOR_R, runS.rightSpeed);
-
-		prevGap = runS.gap;
-		break;
-	/*停止状態*/
-	case STATE_STOP :
-		analogWrite(PIN_MOTOR_L, 0);
-		analogWrite(PIN_MOTOR_R, 0);
-		break;
-	/*例外*/
-	default :
-		analogWrite(PIN_MOTOR_L, 0);
-		analogWrite(PIN_MOTOR_R, 0);
-		break;
-	}
+	changeDrivingMode(&runS, &state);
 	/**ディスプレイに表示**/
 	statusDisplay(&runS, &state);
 }
+
+
 /***各種関数***/
+
+void changeDrivingMode(RunState* pRunS, State* pState){
+	int baseSpeedL;              //左ベーススピード
+	int baseSpeedR;              //右ベーススピード
+	int diff;                   //急激な角度変化量に対応
+	static bool startFlag = true; //稼働時速度調整用
+	static int prevGap = 0;                //直前の角度のgap
+	static int integral = 0;    //積分値
+
+	switch(*pState) {
+		/*待機状態*/
+		case STATE_IDLE :
+			analogWrite(PIN_MOTOR_L, 0);
+			analogWrite(PIN_MOTOR_R, 0);
+			break;
+		/*走行状態*/
+		case STATE_RUN :
+			if(startFlag){
+				pRunS->sensorL = analogRead(PIN_LINE_L);
+				pRunS->sensorR = analogRead(PIN_LINE_R);
+				startFlag = false;
+			}else{
+				/*センサー読み込み*/
+				pRunS->sensorL =
+						(pRunS->sensorL*7 + analogRead(PIN_LINE_L)*3)/10;
+				pRunS->sensorR =
+						(pRunS->sensorR*7 + analogRead(PIN_LINE_R)*3)/10;
+			}
+			/*ラインから外れたら停止する*/
+			if(pRunS->sensorL < STOP_LINE && pRunS->sensorR < STOP_LINE) {
+				/*外れ始め*/
+				if(pRunS->outFlag == false) {
+					pRunS->outStartTime = millis();
+					pRunS->outFlag = true;
+				}
+				/*3秒経過したら停止*/
+				if(millis() - pRunS->outStartTime >= 3000) {
+					state = STATE_STOP;
+					break;
+				}
+			}else {
+				/*ラインに戻ったらリセット*/
+				pRunS->outFlag = false;
+			}
+			/*3周したか確認しゴールしていたら停止させる*/
+			if(checkGoal(&runS) == true) {
+				state = STATE_STOP;
+				break;
+			}
+			/*センサー誤差確認*/
+			//左に重みを少し持たせている
+			pRunS->gap = pRunS->sensorL+85 - pRunS->sensorR;//トレースセンサの誤差調整必要
+			diff = pRunS->gap -prevGap;
+			integral += pRunS->gap;
+			integral = constrain(integral, -2000, 2000);
+
+			/*gapに応じて速度を連続変化*/
+			//基本速度に直接影響
+			baseSpeedL = MOTOR_SPEEDL - abs(pRunS->gap/60) - abs(diff/15);//80,20は調整必要
+			baseSpeedR = MOTOR_SPEEDR - abs(pRunS->gap/60) - abs(diff/15);
+
+			/*baseSpeedを上限下限値に調整*/
+			baseSpeedL = constrain(baseSpeedL,15,MOTOR_SPEEDL);
+			baseSpeedR = constrain(baseSpeedR,15,MOTOR_SPEEDR);
+
+			/*P制御*/
+			//曲がるときの左右の車輪の回転数に直接影響
+			pRunS->control = pRunS->gap / 25 + diff / 7 + integral / 500;//40,15も調整必要
+
+			/*モーター速度調整*/
+			pRunS->leftSpeed = baseSpeedL - pRunS->control;
+			pRunS->rightSpeed = baseSpeedR + pRunS->control;
+
+			//速度制限
+			pRunS->leftSpeed = constrain(pRunS->leftSpeed,0,MAX_SPEED);
+			pRunS->rightSpeed = constrain(pRunS->rightSpeed,0,MAX_SPEED);
+
+			/*モーター始動*/
+			analogWrite(PIN_MOTOR_L, pRunS->leftSpeed);
+			analogWrite(PIN_MOTOR_R, pRunS->rightSpeed);
+
+			prevGap = pRunS->gap;
+			break;
+		/*停止状態*/
+		case STATE_STOP :
+			analogWrite(PIN_MOTOR_L, 0);
+			analogWrite(PIN_MOTOR_R, 0);
+			break;
+		/*例外*/
+		default :
+			analogWrite(PIN_MOTOR_L, 0);
+			analogWrite(PIN_MOTOR_R, 0);
+			break;
+		}
+}
+
 /**ボタンで状態を切り替える関数**/
 void checkBtn(BtnState* pBtnS, State* pState) {
 	/*checkBtn内変数*/
