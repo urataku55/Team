@@ -210,52 +210,74 @@ void checkBtn(BtnState* pBtnS, State* pState) {
 }
 /**走行タイムを計測する関数**/
 void runTimeMeasurement(RunState* pRunS, State* pState) {
+
 	/*走行状態になったら計測開始*/
 	if(pRunS -> timeFlag == false && *pState == STATE_RUN) {
-		pRunS -> runStartTime = millis();
+		pRunS -> runStartTime = now;
 		pRunS -> timeFlag = true;
 	}
+
+	/*RUN中は常時更新*/
+	if(*pState == STATE_RUN){
+		pRunS -> runTime = now - pRunS -> runStartTime;
+	}
+
 	/*停止状態になったら計測終了*/
 	if(pRunS -> timeFlag == true && *pState == STATE_STOP) {
-		pRunS -> runTime = millis() - pRunS -> runStartTime;
 		pRunS -> timeFlag = false;
 	}
 }
+
 /**ディスプレイに状態を表示させる関数**/
 void statusDisplay(RunState* pRunS, State* pState) {
-	LcdDrv_clear();
-	LcdDrv_setCursor(0, 0);
-	unsigned int sec;
-	unsigned int msec;
-	char buf[20];
-	switch(*pState) {
-	/*待機状態*/
-	case STATE_IDLE :
-		LcdDrv_print("\xc0\xb2\xb7\xc1\xa9\xb3");		//ﾀｲｷﾁｭｳ
-		break;
-	/*走行状態*/
-	case STATE_RUN :
-		LcdDrv_print("\xbf\xb3\xba\xb3\xc1\xa9\xb3");	//ｿｳｺｳﾁｭｳ
-		char buf[20];
-		snprintf(buf, sizeof(buf), "CNT:%d", pRunS->lineCount);
-		LcdDrv_setCursor(0,1);
-		LcdDrv_print(buf);
-		break;
-	/*停止状態*/
-	case STATE_STOP :
-		sec = pRunS -> runTime / 1000;
-		msec = (pRunS -> runTime % 1000) / 100;
-		snprintf(buf, sizeof(buf), "%u.%01u s", sec, msec);
-		LcdDrv_print("\xc3\xb2\xbc\xc1\xa9\xb3");		//ﾃｲｼﾁｭｳ
-		LcdDrv_print(buf);
-		break;
-	/*例外*/
-	default :
-		LcdDrv_print("\xb4\xd7\xB0");					//ｴﾗｰ
-		break;
-	}
-	LcdDrv_update();
+
+    unsigned int sec;
+    unsigned int msec;
+    char buf[20];
+
+    /* 時間文字列作成 */
+    sec  = pRunS->runTime / 1000;
+    msec = (pRunS->runTime % 1000) / 100;
+
+    snprintf(buf, sizeof(buf), "TIME:%u.%01u", sec, msec);
+
+    /* LCDクリア */
+    LcdDrv_clear();
+    switch(*pState) {
+
+    /* 待機状態 */
+    case STATE_IDLE :
+        LcdDrv_setCursor(0,0);
+        LcdDrv_print("IDLE");
+        break;
+
+    /* 走行状態 */
+    case STATE_RUN :
+        LcdDrv_setCursor(0,0);
+        LcdDrv_print("RUN");
+        LcdDrv_setCursor(1,0);
+        LcdDrv_print(buf);
+        break;
+
+    /* 停止状態 */
+    case STATE_STOP :
+        LcdDrv_setCursor(0,0);
+        LcdDrv_print("STOP");
+        LcdDrv_setCursor(1,0);
+        LcdDrv_print(buf);
+        break;
+
+    /* エラー */
+    default :
+        LcdDrv_setCursor(0,0);
+        LcdDrv_print("ERROR");
+        break;
+    }
+
+    /* LCD反映 */
+    LcdDrv_update();
 }
+
 void avoidCollision(State* pState){
 	*pState = STATE_IDLE;
 }
