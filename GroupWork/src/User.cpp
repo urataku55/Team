@@ -160,7 +160,7 @@ void changeDrivingMode(RunState* pRunS, State* pState){
 
 			/*P制御*/
 			//曲がるときの左右の車輪の回転数に直接影響
-			pRunS->control = pRunS->gap / 25 + diff / 7 ;//40,15も調整必要+ integral / 500
+			pRunS->control = pRunS->gap / 25 + diff / 7 + integral / 500 ;//40,15も調整必要
 
 			/*モーター速度調整*/
 			pRunS->leftSpeed = baseSpeedL - pRunS->control;
