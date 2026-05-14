@@ -222,15 +222,21 @@ void checkBtn(BtnState* pBtnS, State* pState, RunState* pRunS) {
 	}
 
 	if(pBtnS -> btnState == 1 && *pState != STATE_RUN){
-		pRunS->runTime = 0;
-		pRunS->outStartTime = 0;
-		pRunS->blackLineTime = 0;
-		pRunS->lineTime = 0;
+	    pRunS->lineCount = 0;
+	    pRunS->onLine = false;
+	    pRunS->blackLineTime = 0;
+	    pRunS->lineTime = 0;
+	    pRunS->outFlag = false;
 		*pState = STATE_RUN;
 	}
 
 	if(pBtnS -> btnState == 2){
-		*pState = STATE_IDLE;
+	    pRunS->lineCount = 0;
+	    pRunS->onLine = false;
+	    pRunS->blackLineTime = 0;
+	    pRunS->lineTime = 0;
+	    pRunS->outFlag = false;
+		*pState = STATE_STOP;
 	}
 }
 /**走行タイムを計測する関数**/
@@ -274,12 +280,14 @@ void statusDisplay(RunState* pRunS, State* pState) {
     case STATE_IDLE :
         LcdDrv_setCursor(0,0);
         LcdDrv_print("IDLE");
+        LcdDrv_setCursor(1,0);
+        LcdDrv_print("Button1: Run");
         break;
 
     /* 走行状態 */
     case STATE_RUN :
         LcdDrv_setCursor(0,0);
-        LcdDrv_print("RUN");
+        LcdDrv_print("RUN /Btn2:Stop");
         LcdDrv_setCursor(1,0);
         LcdDrv_print(buf);
         break;
@@ -287,7 +295,7 @@ void statusDisplay(RunState* pRunS, State* pState) {
     /* 停止状態 */
     case STATE_STOP :
         LcdDrv_setCursor(0,0);
-        LcdDrv_print("STOP");
+        LcdDrv_print("STOP /Btn1:Run");
         LcdDrv_setCursor(1,0);
         LcdDrv_print(buf);
         break;
