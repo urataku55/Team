@@ -160,7 +160,7 @@ void changeDrivingMode(RunState* pRunS, State* pState){
 
 			/*P制御*/
 			//曲がるときの左右の車輪の回転数に直接影響
-			pRunS->control = pRunS->gap / 25 + diff / 7 + integral / 500 ;//40,15も調整必要
+			pRunS->control = pRunS->gap / 10 + diff / 5 + integral / 400 ;//40,15も調整必要
 
 			/*モーター速度調整*/
 			pRunS->leftSpeed = baseSpeedL - pRunS->control;
@@ -317,7 +317,7 @@ bool checkGoal(RunState* pRunS) {
 		pRunS -> lineTime = millis();
 	}
 	/*センサーの閾値が両方黒かつ閾値が切り替わる時間が200ms秒以下ならゴールライン上にいるとみなす*/
-	if(isBlackL && isBlackR && (millis() - pRunS -> lineTime <= 200) && pRunS -> onLine == false) {
+	if(isBlackL && isBlackR && (millis() - pRunS -> lineTime <= 300) && pRunS -> onLine == false) {
 		pRunS -> blackLineTime = millis();
 		pRunS -> onLine = true;
 	}
