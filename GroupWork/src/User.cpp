@@ -7,7 +7,7 @@
 #define BTN_ON HIGH						//ボタンON
 #define BTN_OFF LOW						//ボタンOFF
 #define MOTOR_SPEEDL 51					//通常左モーター速度
-#define MOTOR_SPEEDR 50					//通常右モーター速度
+#define MOTOR_SPEEDR 50				//通常右モーター速度
 #define MAX_SPEED 65						//最大速度
 #define STOP_LINE 1500					//停止する閾値(白)
 /**enum**/
@@ -50,7 +50,7 @@ BtnState btnS;
 /**グローバル変数**/
 unsigned long now = 0;		//現在時刻
 /**プロトタイプ宣言**/
-void checkBtn(BtnState* pBtnS, State* pState);
+void checkBtn(BtnState* pBtnS, State* pState, RunState* pRunS);
 void runTimeMeasurement(RunState* pRunS, State* pState);
 void statusDisplay(RunState* pRunS, State* pState);
 void avoidCollision(State* pState);
@@ -74,7 +74,7 @@ void loop() {
 	/**ボタンをチェックする(BTN_PERIOD ms秒)**/
 	if(now - btnS.prev >= BTN_PERIOD) {
 		btnS.prev = now;
-		checkBtn(&btnS, &state);
+		checkBtn(&btnS, &state, &runS);
 	}
 	/*5cm先にものがあったら停止する*/
 	if(analogRead(PIN_DISTANCE) < 50){
@@ -160,7 +160,7 @@ void changeDrivingMode(RunState* pRunS, State* pState){
 
 			/*P制御*/
 			//曲がるときの左右の車輪の回転数に直接影響
-			pRunS->control = pRunS->gap / 25 + diff / 7 + integral / 500;//40,15も調整必要
+			pRunS->control = pRunS->gap / 25 + diff / 7 ;//40,15も調整必要+ integral / 500
 
 			/*モーター速度調整*/
 			pRunS->leftSpeed = baseSpeedL - pRunS->control;
@@ -190,41 +190,47 @@ void changeDrivingMode(RunState* pRunS, State* pState){
 }
 
 /**ボタンで状態を切り替える関数**/
-void checkBtn(BtnState* pBtnS, State* pState) {
+void checkBtn(BtnState* pBtnS, State* pState, RunState* pRunS) {
+
+	pBtnS -> btnLast = pBtnS -> btnState;//直前の入力をbtnLastに格納
+
 	/*checkBtn内変数*/
-	int reading = digitalRead(PIN_BTN1);
-	/*チャタリング防止 50ms秒*/
-	if(reading != pBtnS -> btnLast) {
-		pBtnS -> btnLast = reading;
-		pBtnS -> changeTime = now;
+	int reading; //0:入力なし　1：ボタン１　2:ボタン２
+	if(digitalRead(PIN_BTN1) == true){
+		reading = 1;
+	}else if(digitalRead(PIN_BTN2) == true){
+		reading = 2;
+	}else{
+		reading = 0;
 	}
+
+	/*チャタリング防止 50ms秒*/
 	if((now - pBtnS -> changeTime) < CHATTERING_DURATION) {
 		return;
 	}
-	/*状態変化チェック(変化なしの場合)*/
-	if(reading == pBtnS -> btnState) {
+
+	//現在の入力をbtnStateに格納
+	pBtnS -> btnState = reading;
+
+	//入力が変更されたらchangeTime更新
+	/*状態変化チェック(変化ありの場合)*/
+	if(pBtnS -> btnState != pBtnS -> btnLast) {
+		pBtnS -> changeTime = now;
+	}else{
+		/*状態変化チェック(変化なしの場合)*/
 		return;
-	/*変化ありの場合*/
-	}else {
-		pBtnS -> btnState = reading;
 	}
-	/*押された瞬間*/
-	if(pBtnS -> btnState == BTN_ON) {
-		pBtnS -> pressTime = now;
-		return;
-	/*離された瞬間*/
-	}else {
-		pBtnS -> pressDuration = now - pBtnS -> pressTime;
-	}
-	/*状態遷移(3秒以上押下した場合)*/
-	if(pBtnS -> pressDuration >= LONG_PRESS_TIME) {
-		*pState = STATE_IDLE;
-	/*アイドル状態の場合*/
-	}else if(*pState == STATE_IDLE) {
+
+	if(pBtnS -> btnState == 1 && *pState != STATE_RUN){
+		pRunS->runTime = 0;
+		pRunS->outStartTime = 0;
+		pRunS->blackLineTime = 0;
+		pRunS->lineTime = 0;
 		*pState = STATE_RUN;
-	/*走行状態(それ以外)の場合*/
-	}else {
-		*pState = STATE_STOP;
+	}
+
+	if(pBtnS -> btnState == 2){
+		*pState = STATE_IDLE;
 	}
 }
 /**走行タイムを計測する関数**/
